@@ -1,0 +1,23 @@
+<policies>
+    <inbound>
+        <base />
+        <cors allow-credentials="true" terminate-unmatched-request="true">
+            <allowed-origins>
+                <<origins>>
+            </allowed-origins>
+        </cors>         
+        <check-header name="<<SUBSCRIPTION-KEY>>" failed-check-httpcode="403" failed-check-error-message="Missing required header">
+            <value>@(context.Subscription.Id)</value>
+        </check-header>
+        <!-- API requires an authentication token from the Entra integration app -->        
+        <authentication-managed-identity resource="<<FNAP-URL>>" output-token-variable-name="integration-token-var" ignore-error="false"/>
+        <set-header name="Authorization" exists-action="override">
+            <value>@(context.Variables.GetValueOrDefault("integration-token-var", ""))</value>
+        </set-header>
+    </inbound>
+    <backend>
+        <limit-concurrency key="@(context.Request.IpAddress)" max-count="10">
+            <forward-request />
+        </limit-concurrency>
+    </backend>    
+</policies>

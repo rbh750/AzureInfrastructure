@@ -1,0 +1,23 @@
+[
+    {
+        "allowedMemberType": [
+            "Application"
+        ],
+        "displayName": "Role.Test",
+        "value": "Role.Test",
+        "addAsPermission": false,
+        "description": "This role allows to 1..."
+    },
+    {
+        "allowedMemberType": [
+            "Application"
+        ],
+        "displayName": "Role.Test2",
+        "value": "Role.Test2",
+        "addAsPermission": true,
+        "description": "This role allows to 2..."
+    }
+]
+
+
+

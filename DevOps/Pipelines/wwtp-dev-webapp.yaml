@@ -1,0 +1,60 @@
+pr: none
+schedules: []
+
+pool:
+  name: "Azure Pipelines"
+  vmImage: "windows-latest"
+
+resources:
+  repositories:
+    - repository: Ssmp
+      type: git
+      name: "Ssmp/Ssmp"
+      ref: "refs/heads/master"
+      trigger: none
+ 
+parameters:
+  - name: appServiceDeployToStaging
+    displayName: "Deploy to Staging Slot"
+    type: boolean
+    default: true
+  - name: appServiceName
+    displayName: "Web App Name"
+    type: string
+    default: "wwtp-dev-web-app-229"
+  - name: appServicePlan
+    displayName: "App Service Plan"
+    type: string
+    default: "wwtp-dev-web-splan-229"
+  - name: appProject
+    displayName: "Project Name"
+    type: string
+    default: "WebApp.Wwtp"
+  - name: appType
+    displayName: "App Type"
+    type: string
+    default: "WebApp"
+  - name: devopsEnvironment
+    displayName: "DevOps Environment"
+    type: string
+    default: "Dev"
+  - name: keyVault
+    displayName: "Key Vault Name"
+    type: string
+    default: "wwtp-dev-kv-229"
+  - name: resourceGroupName
+    displayName: "Resource Group Name"
+    type: string
+    default: "wwtp-dev-rg-229"
+
+extends:
+  template: app-service-app-template.yaml
+  parameters:
+    appServiceDeployToStaging: ${{ parameters.appServiceDeployToStaging }}
+    appServiceName: ${{ parameters.appServiceName }}
+    appServicePlan: ${{ parameters.appServicePlan }}
+    appProject: ${{ parameters.appProject }}
+    appType: ${{ parameters.appType }}
+    devopsEnvironment: ${{ parameters.devopsEnvironment }}
+    keyVault: ${{ parameters.keyVault }}
+    resourceGroupName: ${{ parameters.resourceGroupName }}

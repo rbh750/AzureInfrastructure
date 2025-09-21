@@ -1,0 +1,12 @@
+[
+    {
+        "apiId": "00000003-0000-0000-c000-000000000000",
+        "permissions": [
+            {
+                "permissionId": "a154be20-db9c-4678-8ab7-66f6cc099a59",
+                "type": "Scope"
+            }       
+        ]
+    }   
+]
+

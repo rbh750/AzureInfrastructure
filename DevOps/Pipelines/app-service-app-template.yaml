@@ -1,0 +1,552 @@
+# Proyect Settings => Disable implied YAML CI trigger: Do not trigger the pipeline if the trigger section is missing.
+
+parameters:
+  - name: appServiceDeployToStaging
+    displayName: "Deploy to Staging Slot"
+    type: boolean
+    default: true
+  - name: appServiceName
+    displayName: "Web App Name"
+    type: string
+    default: ""
+  - name: appServicePlan
+    displayName: "App Service Plan"
+    type: string
+    default: ""
+  - name: appProject
+    displayName: "Project Name"
+    type: string
+    default: "WebApp.Wwtp"
+    values:
+      - WebApp.Wwtp
+      - Api.Public
+      - Api.Private
+  - name: appType
+    displayName: "App Type"
+    type: string
+    default: "WebApp"
+    values:
+      - WebApp
+      - FnApp
+  - name: devopsEnvironment
+    displayName: "DevOps Environment"
+    type: string
+    values:
+      - Dev
+    default: "Dev"
+  - name: keyVault
+    displayName: "Key Vault Name"
+    type: string
+    default: ""
+  - name: resourceGroupName
+    displayName: "Resource Group Name"
+    type: string
+    default: ""
+
+variables:
+  # Because PowerShell@2 does not support direct usage of ${{ parameters.myParm }} in inline scripts, 
+  # appServiceDeployToStaging and appServiceName must be converted to variables.
+  appServiceDeployToStaging: ${{ parameters.appServiceDeployToStaging }}
+  appServiceName: ${{ parameters.appServiceName }}
+  appServiceSettingsArtifact: "UpdateAppSettingsArtifact"
+  appServiceSettingsScript: "DeployAppSettings.ps1"
+  buildConfiguration: "Release"
+  buildOutputDirectory: "publish"
+  dotNetVersion: "9.x"
+  excelArtifact: "ExcelArtifact"
+  excelFileName: "SettingsIndex.xlsx"
+  findFileArtifact: "FindFileArtifact"
+  findFileScript: "FindFileByName.ps1"
+  keyVaultArtifact: "KeyVaultArtifact"
+  keyVaultScript: "KeyVaultSecrets.ps1"
+  publishArtifactFloder: "drop"
+  serviceConnection: "TestWwtpServiceCnn"
+  serviceConnectionEntraAppClientId: "f44835cf-55af-41ea-81fb-7c8cdeb56fe7"
+  serviceConnectionIamScript: "$(Build.SourcesDirectory)/DevOps/PowerShell/AppServiceIam.ps1"
+  serviceConnectionSubscriptionId: "70147690-87c9-4c3b-9b92-b0470e17a3ab"
+  settingsManagerArtifact: "SettingsManagerArtifact"
+  settingsManagerScript: "SettingsManager.ps1"
+  troubleshootPipeline: true
+  isWebApp: ${{ eq(parameters.appType, 'WebApp') }}
+
+  appProject: ${{ parameters.appProject }}
+
+stages:
+  - stage: Build
+    displayName: "Build and Publish"
+    jobs:
+      - job: Build
+        displayName: "Build and Publish"
+        steps:
+          - checkout: self
+            persistCredentials: true
+            clean: true
+            displayName: "Checkout Source Code"
+
+          - ${{ if eq(variables['troubleshootPipeline'], true) }}:
+            - task: PowerShell@2
+              displayName: "Display All Pipeline Parameters"
+              inputs:
+                targetType: "inline"
+                script: |
+                  Write-Host "Pipeline Parameters:"
+                  Write-Host "appServiceDeployToStaging: ${{ parameters.appServiceDeployToStaging }}"
+                  Write-Host "appServiceName: ${{ parameters.appServiceName }}"
+                  Write-Host "appServicePlan: ${{ parameters.appServicePlan }}"
+                  Write-Host "appProject: ${{ parameters.appProject }}"
+                  Write-Host "appType: ${{ parameters.appType }}"
+                  Write-Host "devopsEnvironment: ${{ parameters.devopsEnvironment }}"
+                  Write-Host "keyVault: ${{ parameters.keyVault }}"
+                  Write-Host "resourceGroupName: ${{ parameters.resourceGroupName }}"  
+
+          # Find and save the script for updating application settings as an artifact for future use.
+          - task: PowerShell@2
+            displayName: "Find $(appServiceSettingsScript) script"
+            inputs:
+              targetType: "inline"
+              script: |
+                $scriptPath = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Filter "$(appServiceSettingsScript)" | Select-Object -ExpandProperty FullName
+                Write-Host "Found script at: $scriptPath"
+                Write-Host "##vso[task.setvariable variable=deployScriptPath]$scriptPath"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish $(appServiceSettingsScript) artifact"
+            inputs:
+              targetPath: $(deployScriptPath)
+              artifactName: $(appServiceSettingsArtifact)
+              publishLocation: "pipeline"
+
+          # Find and save the script for adding secrets to key vault.
+          - task: PowerShell@2
+            displayName: "Find $(keyVaultScript) script"
+            inputs:
+              targetType: "inline"
+              script: |
+                $scriptPath = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Filter "$(keyVaultScript)" | Select-Object -ExpandProperty FullName
+                Write-Host "Found script at: $scriptPath"
+                Write-Host "##vso[task.setvariable variable=deployScriptPath]$scriptPath"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish $(keyVaultScript) artifact"
+            inputs:
+              targetPath: $(deployScriptPath)
+              artifactName: $(keyVaultArtifact)
+              publishLocation: "pipeline"
+
+          # Find and save the script for retrieving secrets from the Excel file.
+          - task: PowerShell@2
+            displayName: "Find $(settingsManagerScript) script"
+            inputs:
+              targetType: "inline"
+              script: |
+                $scriptPath = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Filter "$(settingsManagerScript)" | Select-Object -ExpandProperty FullName
+                Write-Host "Found script at: $scriptPath"
+                Write-Host "##vso[task.setvariable variable=deployScriptPath]$scriptPath"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish $(settingsManagerScript) artifact"
+            inputs:
+              targetPath: $(deployScriptPath)
+              artifactName: $(settingsManagerArtifact)
+              publishLocation: "pipeline"
+
+          # Find and save the script for find files.
+          - task: PowerShell@2
+            displayName: "Find $(findFileScript) script"
+            inputs:
+              targetType: "inline"
+              script: |
+                $scriptPath = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Filter "$(findFileScript)" | Select-Object -ExpandProperty FullName
+                Write-Host "Found script at: $scriptPath"
+                Write-Host "##vso[task.setvariable variable=deployScriptPath]$scriptPath"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish $(findFileScript) artifact"
+            inputs:
+              targetPath: $(deployScriptPath)
+              artifactName: $(findFileArtifact)
+              publishLocation: "pipeline"
+
+          # Find and save the Excel file with the settings.
+          - task: PowerShell@2
+            displayName: "Find $(excelFileName) file"
+            inputs:
+              targetType: "inline"
+              script: |
+                $scriptPath = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Filter "$(excelFileName)" | Select-Object -ExpandProperty FullName
+                Write-Host "Found script at: $scriptPath"
+                Write-Host "##vso[task.setvariable variable=deployScriptPath]$scriptPath"
+
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish $(excelFileName) artifact"
+            inputs:
+              targetPath: $(deployScriptPath)
+              artifactName: $(excelArtifact)
+              publishLocation: "pipeline"
+
+          # Ensure the specified .NET SDK version is available on the build agent.
+          - task: UseDotNet@2
+            inputs:
+              packageType: "sdk"
+              version: "$(dotNetVersion)"
+              installationPath: $(Agent.ToolsDirectory)/dotnet
+
+          - task: PowerShell@2
+            displayName: "List Build Sources Directory"
+            inputs:
+              targetType: "inline"
+              script: |
+                Write-Host "Listing contents of Build.SourcesDirectory"
+                Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse | Format-List -Property FullName, Length, LastWriteTime                   
+
+          - task: DotNetCoreCLI@2
+            displayName: "Restore NuGet packages"
+            inputs:
+              command: "restore"
+              projects: "$(Build.SourcesDirectory)/Apis/Public/Api.Public.csproj"
+
+
+          - task: DotNetCoreCLI@2
+            displayName: "Build Project"
+            inputs:
+              command: "build"
+              projects: "$(Build.SourcesDirectory)/Apis/Public/Api.Public.csproj"
+              arguments: "--configuration $(buildConfiguration) --no-restore"
+
+          # # Publish project in $(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)
+          # - task: DotNetCoreCLI@2
+          #   displayName: "Publish"
+          #   inputs:
+          #     command: "publish"
+          #     projects: "$(Build.SourcesDirectory)/Apis/Public/Api.Public.csproj"
+          #     arguments: "--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)"
+
+          - task: PowerShell@2
+            displayName: "Buld and Zip using PowerShell Script"
+            inputs:
+              targetType: "inline"
+              script: |
+                # Change directory to the project's folder
+                cd "$(Build.SourcesDirectory)/Apis/Public"
+
+                # Verify the project file exists
+                if (!(Test-Path "./Api.Public.csproj")) {
+                    Write-Error "Project file 'Api.Public.csproj' not found."
+                    exit 1
+                }
+
+                # Execute the dotnet publish command
+                dotnet publish "Api.Public.csproj" --configuration $(buildConfiguration) --output "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)"
+                
+                Write-Host "Build completed successfully."
+
+                # Compress the published output into a zip file
+                $publishFolder = "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)"
+                $zipFile = "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)/$(appProject).zip"
+                
+                if (Test-Path $zipFile) {
+                    Remove-Item $zipFile -Force
+                }
+                
+                Write-Host "Creating zip archive..."
+                Compress-Archive -Path "$publishFolder\*" -DestinationPath $zipFile
+                
+                Write-Host "Zip archive created at: $zipFile"    
+
+          - task: PowerShell@2
+            displayName: "List Publish Directory"
+            inputs:
+              targetType: "inline"
+              script: |
+                Write-Host "List contents of Build.ArtifactStagingDirectory"
+                Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory))" -Recurse | Format-List -Property FullName, Length, LastWriteTime                        
+
+          # Collect the published package from $(Build.ArtifactStagingDirectory)/$(buildOutputDirectory) and save it to the $(publishArtifactFloder folder.
+          # This artifact is not a physical directory located on the agent machine; instead, it's stored in the pipeline’s storage managed by DevOps.
+          - task: PublishPipelineArtifact@1
+            displayName: "Publish Artifact"
+            inputs:
+              targetPath: "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)/$(appProject).zip"
+              artifactName: "$(publishArtifactFloder)"
+              publishLocation: "pipeline"
+
+          - ${{ if eq(variables['troubleshootPipeline'], true) }}:
+              - task: PowerShell@2
+                displayName: "List Agent Directories"
+                inputs:
+                  targetType: "inline"
+                  script: |
+                    Write-Host "Agent Directories:"
+                    Write-Host "The Build.ArtifactStagingDirectory is not available in this stage. Is specific to the build agent running the build stage task."
+
+                    Write-Host "1 Agent build: $(Agent.BuildDirectory)"
+                    Get-ChildItem -Path "$(Agent.BuildDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+                    Write-Host "2 Atifacts: $(System.ArtifactsDirectory)"
+                    Get-ChildItem -Path "$(System.ArtifactsDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"                
+
+                    Write-Host "3 Build Artifact staging: $(Build.ArtifactStagingDirectory)"
+                    Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+                    Write-Host "4 Binaries: $(Build.BinariesDirectory)"
+                    Get-ChildItem -Path "$(Build.BinariesDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+                    Write-Host "5 Build artifact output Directory: $(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)"
+                    Get-ChildItem -Path "$(Build.ArtifactStagingDirectory)/$(buildOutputDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************" 
+
+                    Write-Host "6 Sources Directory: $(Build.SourcesDirectory)"
+                    Get-ChildItem -Path "$(Build.SourcesDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+                    Write-Host "7 Default Working Directory: $(System.DefaultWorkingDirectory)"
+                    Get-ChildItem -Path "$(System.DefaultWorkingDirectory)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+                    Write-Host "8 Pipeline Workspace: $(Pipeline.Workspace)"
+                    Get-ChildItem -Path "$(Pipeline.Workspace)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                    Write-Host "****************************************************************"
+
+  - stage: Deploy
+    displayName: "Deploy to App Service"
+    dependsOn: Build
+    jobs:
+      - deployment: Deploy
+        displayName: "Deploy to App Service"
+        environment: "${{ parameters.devopsEnvironment }}"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # While Azure DevOps automatically includes a download artifact task at the beginning of a job that depends on artifacts from previous jobs,
+                # it's advisable to explicitly download artifact to ensure greater control over which artifact is retrieved.
+                # For instance, if the build fails, an artifact from another pipeline can be downloaded instead
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    artifact: "$(publishArtifactFloder)"
+                    targetPath: "$(Pipeline.Workspace)/DownloadedArtifact"
+
+                # Download scripts to update the app settings.
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download $(appServiceSettingsArtifact) script"
+                  inputs:
+                    artifactName: $(appServiceSettingsArtifact)
+                    targetPath: $(Pipeline.Workspace)
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download $(findFileArtifact) script"
+                  inputs:
+                    artifactName: $(findFileArtifact)
+                    targetPath: $(Pipeline.Workspace)
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download $(keyVaultArtifact) script"
+                  inputs:
+                    artifactName: $(keyVaultArtifact)
+                    targetPath: $(Pipeline.Workspace)
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download $(settingsManagerArtifact) script"
+                  inputs:
+                    artifactName: $(settingsManagerArtifact)
+                    targetPath: $(Pipeline.Workspace)
+
+                - task: DownloadPipelineArtifact@2
+                  displayName: "Download $(excelArtifact) script"
+                  inputs:
+                    artifactName: $(excelArtifact)
+                    targetPath: $(Pipeline.Workspace)
+
+                - ${{ if eq(variables['troubleshootPipeline'], true) }}:
+                    - task: PowerShell@2
+                      displayName: "List Agent Directories"
+                      inputs:
+                        targetType: "inline"
+                        script: |
+                          Write-Host "Agent Directories:"
+                          Write-Host ""
+
+                          Write-Host "Pipeline workspace: '$(Pipeline.Workspace)"
+                          Get-ChildItem -Path "$(Pipeline.Workspace)/" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                          Write-Host "****************************************************************"                             
+
+                          Write-Host "Pipeline workspace published artifact: '$(Pipeline.Workspace)/$(publishArtifactFloder)"
+                          Write-Host "This is the directory in which the artifact was published."
+                          Get-ChildItem -Path "$(Pipeline.Workspace)/$(publishArtifactFloder)" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                          Write-Host "****************************************************************"                                
+
+                          Write-Host "Pipeline workspace downloaded artifact: '$(Pipeline.Workspace)/DownloadedArtifact"
+                          Write-Host "This is directory where the artifact was explicitly downloaded."                      
+                          Get-ChildItem -Path "$(Pipeline.Workspace)/DownloadedArtifact" | Format-List -Property Name, LastWriteTime, Length | Out-String
+                          Write-Host "****************************************************************"
+
+                - task: PowerShell@2
+                  displayName: "Check and Install Az PowerShell Module"
+                  inputs:
+                    targetType: "inline"
+                    script: |
+                      # Check if Az module is installed
+                      if (-not (Get-Module -ListAvailable -Name Az)) {
+                          Write-Host "Az module not found. Installing..."
+                          Install-Module -Name Az -Scope CurrentUser -AllowClobber -Force
+                      } else {
+                          Write-Host "Az module is already installed."
+                      }
+
+                      # Verify installed version
+                      Get-Module -Name Az -ListAvailable | Select-Object Name, Version, Path
+                    pwsh: true
+
+                # Set the slotName variabls based on whether deploying to staging or production.
+                - task: PowerShell@2
+                  displayName: "Set variables"
+                  inputs:
+                    targetType: inline
+                    script: |
+                      Write-Host "appServiceDeployToStaging = $(appServiceDeployToStaging)"
+                      if ("$(appServiceDeployToStaging)" -eq "true") {
+                          $slotName = "staging"
+                      } else {
+                          $slotName = ""
+                      }
+                      Write-Host "##vso[task.setvariable variable=slotName]$slotName"
+
+                # Output dynamically generated variables.
+                - ${{ if eq(variables['troubleshootPipeline'], true) }}:
+                    - task: PowerShell@2
+                      displayName: "Show dynamic variables"
+                      inputs:
+                        targetType: "inline"
+                        script: |
+                          Write-Host "Parameter appServiceDeployToStaging:"
+                          Write-Host ${{ parameters.appServiceDeployToStaging }}
+
+                          Write-Host "Variable appServiceDeployToStaging"
+                          Write-Host $(appServiceDeployToStaging)
+
+                          Write-Host "Parameter appServiceName"
+                          Write-Host ${{ parameters.appServiceName }}
+
+                          Write-Host "Variable appServiceName"
+                          Write-Host $(appServiceName)
+
+                          Write-Host "Variable slotName"
+                          Write-Host $(slotName)
+
+                # Blue-Green Deployment with Azure App Service Slots:
+                # 1. Start the staging slot to ensure it is running and ready for deployment.
+                # 2. Deploy the application package to the staging slot using AzureWebApp@1 or AzureFunctionApp@2.
+                # 3. Swap the staging slot with the production slot, making the new deployment live with zero downtime.
+                # 4. Stop the staging slot after the swap to free up resources.
+
+                # Start the staging slot if not deploying to production.
+                - ${{ if eq(parameters.appServiceDeployToStaging, true) }}:
+                    - task: AzureCLI@2
+                      displayName: "Start Staging Slot"
+                      inputs:
+                        azureSubscription: "$(serviceConnection)"
+                        scriptType: "ps"
+                        scriptLocation: "inlineScript"
+                        inlineScript: |
+                          az webapp start `
+                            --resource-group "${{ parameters.resourceGroupName }}" `
+                            --name "$(appServiceName)" `
+                            --slot "staging"
+
+                # Authenticate to Azure using the service connection.
+                # AzurePowerShell@5 is optimized for executing Azure PowerShell commands within Azure DevOps.
+                # No credentials are needed as AzurePowerShell@5 handles authentication via the service connection.
+                # - task: AzurePowerShell@5
+                #   displayName: "Configure App Settings"
+                #   inputs:
+                #     azureSubscription: "$(serviceConnection)"
+                #     pwsh: true
+                #     azurePowerShellVersion: "LatestVersion"
+                #     errorActionPreference: stop
+                #     ScriptType: "InlineScript"
+                #     Inline: |
+                #       # Authenticate explicitly
+                #       Set-AzContext -SubscriptionId "$(serviceConnectionSubscriptionId)"
+
+                #       # Run the script with required parameters
+                #       try {
+                #         & "$(Pipeline.Workspace)\$(appServiceSettingsScript)" `
+                #           -AppServiceName "$(appServiceName)" `
+                #           -Environment "${{ parameters.devopsEnvironment }}" `
+                #           -IsWebApp $(isWebApp) `
+                #           -KeyVaultName "${{ parameters.keyVault }}" `
+                #           -ResourceGroupName "${{ parameters.resourceGroupName }}" `
+                #           -SlotName "$(slotName)" `
+
+                #         & "$(Pipeline.Workspace)\$(appServiceSettingsScript)" `
+                #           -AppServiceName "$(appServiceName)" `
+                #           -Environment "${{ parameters.devopsEnvironment }}" `
+                #           -IsWebApp $(isWebApp) `
+                #           -KeyVaultName "${{ parameters.keyVault }}" `
+                #           -ResourceGroupName "${{ parameters.resourceGroupName }}" `
+                #           -SlotName "$(slotName)" 
+                #       }
+                #       catch {
+                #         Write-Error "An error occurred while configuring app settings: $($_.Exception.Message)"
+                #         exit 1
+                #       }
+
+                - ${{ if eq(parameters.appType, 'WebApp') }}:
+                    # Collect the artifact Server.zip from the designated directory and deploy the Blazor app.
+                    # When publishing a Blazor app with hybrid rendering, two files are generated: Server.zip and Client.zip.
+                    # The Server.zip file is used for deployment, while the Client.zip file is not needed in this context.
+                    - task: AzureWebApp@1
+                      displayName: "Deploy Web App"
+                      inputs:
+                        azureSubscription: "$(serviceConnection)"
+                        appType: "webApp"
+                        appName: ${{ parameters.appServiceName}}
+                        resourceGroupName: "${{parameters.resourceGroupName}}"
+                        appServicePlan: "${{parameters.appServicePlan}}"
+                        package: "$(Pipeline.Workspace)/DownloadedArtifact/Server.zip"
+                        deploymentMethod: "zipDeploy"
+                        slotName: $(slotName)
+
+                - ${{ if eq(parameters.appType, 'FnApp') }}:
+                    # Collect the artifact {{parameters.appProject}}.zip from the designated directory and deploy the Azure Function App.
+                    - task: AzureFunctionApp@2
+                      displayName: "Deploy Function App"
+                      inputs:
+                        azureSubscription: "$(serviceConnection)"
+                        appType: "functionApp"
+                        appName: ${{ parameters.appServiceName}}
+                        resourceGroupName: "${{parameters.resourceGroupName}}"
+                        package: "$(Pipeline.Workspace)/DownloadedArtifact/$(appProject).zip"
+                        slotName: $(slotName)
+
+                # If deploying to staging, swap the staging slot with production and stop the staging slot.
+                - ${{ if eq(parameters.appServiceDeployToStaging, true) }}:
+                    - task: AzureCLI@2
+                      displayName: "Swap Staging Slot to Production"
+                      inputs:
+                        azureSubscription: "$(serviceConnection)"
+                        scriptType: "ps"
+                        scriptLocation: "inlineScript"
+                        inlineScript: |
+                          az webapp deployment slot swap `
+                            --resource-group "${{ parameters.resourceGroupName }}" `
+                            --name "${{ parameters.appServiceName }}" `
+                            --slot "staging" `
+                            --action swap
+
+                # Stop the staging slot to free up resources.
+                - task: AzureCLI@2
+                  displayName: "Stop Staging Slot"
+                  inputs:
+                    azureSubscription: "$(serviceConnection)"
+                    scriptType: "ps"
+                    scriptLocation: "inlineScript"
+                    inlineScript: |
+                      az webapp stop `
+                        --resource-group "${{ parameters.resourceGroupName }}" `
+                        --name "$(appServiceName)" `
+                        --slot "staging"

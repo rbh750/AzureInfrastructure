@@ -1,0 +1,140 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.34.44.8038",
+      "templateHash": "3945487172596987124"
+    }
+  },
+  "parameters": {
+    "apimServiceName": {
+      "type": "string"
+    },
+    "privateApiDisplayName": {
+      "type": "string"
+    },
+    "privateApiName": {
+      "type": "string"
+    },
+    "publicApiDisplayName": {
+      "type": "string"
+    },
+    "publicApiName": {
+      "type": "string"
+    },
+    "publisherEmail": {
+      "type": "string"
+    },
+    "publisherName": {
+      "type": "string"
+    },
+    "privateSubscriptionName": {
+      "type": "string"
+    },
+    "publicSubscriptionName": {
+      "type": "string"
+    },
+    "privateSubscriptionPrimaryKey": {
+      "type": "string"
+    },
+    "privateSubscriptionSecondaryKey": {
+      "type": "string"
+    },
+    "publicSubscriptionPrimaryKey": {
+      "type": "string"
+    },
+    "publicSubscriptionSecondaryKey": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "publicApiWebServiceUrl": "[format('https://{0}', parameters('publicApiName'))]",
+    "privateApiWebServiceUrl": "[format('https://{0}', parameters('privateApiName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2021-08-01",
+      "name": "[parameters('apimServiceName')]",
+      "location": "[variables('location')]",
+      "sku": {
+        "name": "Consumption",
+        "capacity": 0
+      },
+      "properties": {
+        "publisherEmail": "[parameters('publisherEmail')]",
+        "publisherName": "[parameters('publisherName')]"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), parameters('publicApiName'))]",
+      "properties": {
+        "serviceUrl": "[variables('publicApiWebServiceUrl')]",
+        "displayName": "[parameters('publicApiDisplayName')]",
+        "path": "[parameters('publicApiName')]",
+        "protocols": [
+          "https"
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), parameters('privateApiName'))]",
+      "properties": {
+        "serviceUrl": "[variables('privateApiWebServiceUrl')]",
+        "displayName": "[parameters('privateApiDisplayName')]",
+        "path": "[parameters('privateApiName')]",
+        "protocols": [
+          "https"
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/subscriptions",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), parameters('privateSubscriptionName'))]",
+      "properties": {
+        "scope": "[format('/apis/{0}', parameters('privateApiName'))]",
+        "displayName": "[parameters('privateSubscriptionName')]",
+        "primaryKey": "[parameters('privateSubscriptionPrimaryKey')]",
+        "secondaryKey": "[parameters('privateSubscriptionSecondaryKey')]",
+        "state": "active"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), parameters('privateApiName'))]",
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/subscriptions",
+      "apiVersion": "2021-08-01",
+      "name": "[format('{0}/{1}', parameters('apimServiceName'), parameters('publicSubscriptionName'))]",
+      "properties": {
+        "scope": "[format('/apis/{0}', parameters('publicApiName'))]",
+        "displayName": "[parameters('publicSubscriptionName')]",
+        "primaryKey": "[parameters('publicSubscriptionPrimaryKey')]",
+        "secondaryKey": "[parameters('publicSubscriptionSecondaryKey')]",
+        "state": "active"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), parameters('publicApiName'))]",
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ]
+    }
+  ]
+}

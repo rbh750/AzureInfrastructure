@@ -1,0 +1,21 @@
+[
+    {
+        "apiId": "00000003-0000-0000-c000-000000000000",
+        "permissions": [
+            {
+                "permissionId": "e1fe6dd8-ba31-4d61-89e7-88639da4683d",
+                "type": "Scope"
+            }             
+        ]
+    },
+    {
+        "apiId": "f5c26e74-f226-4ae8-85f0-b4af0080ac9e",
+        "permissions": [
+            {
+                "permissionId": "3c63f9fe-1706-42a7-9f53-25b47753d668",
+                "type": "Application"
+            }       
+        ]
+    }    
+]
+

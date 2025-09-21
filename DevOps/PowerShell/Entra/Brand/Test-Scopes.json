@@ -1,0 +1,35 @@
+[
+    {
+        "value": "Admin.Permission",
+        "type": "Admin",
+        "adminConsentDisplayName": "Admin Permission",
+        "adminConsentDescription": "This is a detailed description of the scope that is displayed when tenant admins expand a scope on the consent screen.",
+        "userConsentDisplayName": "Admin Permission",
+        "userConsentDescription": "Description of the permission displayed in consent screen when the user logs in.",
+        "isEnabled": true,
+        "addAsPermission": true,
+        "preAuthorizedApplications": []
+    },
+    {
+        "value": "User.Permission",
+        "type": "User",
+        "adminConsentDisplayName": "User Permission",
+        "adminConsentDescription": "This is a detailed description of the scope that is displayed when tenant admins expand a scope on the consent screen.",
+        "userConsentDisplayName": "User Permission",
+        "userConsentDescription": "Description of the permission displayed in consent screen when the user logs in.",
+        "isEnabled": true,
+        "addAsPermission": true,
+        "preAuthorizedApplications": [
+            {
+                "appId": "dummy",
+                "name": "reactjs2",
+                "delegatedPermissionIds": []
+            },
+            {
+                "appId": "dummy",
+                "name": "wwtp-proto",
+                "delegatedPermissionIds": []
+            }
+        ]
+    }
+]
